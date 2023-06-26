@@ -4828,42 +4828,6 @@ static int cnss_mhi_bw_scale(struct mhi_controller *mhi_ctrl,
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_IPC_LOGGING)
-static int cnss_pci_mhi_ipc_logging_init(struct cnss_pci_data *pci_priv)
-{
-	struct mhi_controller *mhi_ctrl = pci_priv->mhi_ctrl;
-
-	mhi_ctrl->log_buf = ipc_log_context_create(CNSS_IPC_LOG_PAGES,
-						   "cnss-mhi", 0);
-	if (!mhi_ctrl->log_buf)
-		cnss_pr_err("Unable to create CNSS MHI IPC log context\n");
-
-	mhi_ctrl->cntrl_log_buf = ipc_log_context_create(CNSS_IPC_LOG_PAGES,
-							 "cnss-mhi-cntrl", 0);
-	if (!mhi_ctrl->cntrl_log_buf)
-		cnss_pr_err("Unable to create CNSS MHICNTRL IPC log context\n");
-
-	return 0;
-}
-
-static void cnss_pci_mhi_ipc_logging_deinit(struct cnss_pci_data *pci_priv)
-{
-	struct mhi_controller *mhi_ctrl = pci_priv->mhi_ctrl;
-
-	if (mhi_ctrl->log_buf)
-		ipc_log_context_destroy(mhi_ctrl->log_buf);
-	if (mhi_ctrl->cntrl_log_buf)
-		ipc_log_context_destroy(mhi_ctrl->cntrl_log_buf);
-}
-#else
-static int cnss_pci_mhi_ipc_logging_init(struct cnss_pci_data *pci_priv)
-{
-	return 0;
-}
-
-static void cnss_pci_mhi_ipc_logging_deinit(struct cnss_pci_data *pci_priv) {}
-#endif
-
 static int cnss_pci_register_mhi(struct cnss_pci_data *pci_priv)
 {
 	int ret = 0;
@@ -4923,7 +4887,15 @@ static int cnss_pci_register_mhi(struct cnss_pci_data *pci_priv)
 	mhi_ctrl->fbc_download = true;
 	mhi_ctrl->rddm_supported = true;
 
-	cnss_pci_mhi_ipc_logging_init(pci_priv);
+	mhi_ctrl->log_buf = ipc_log_context_create(CNSS_IPC_LOG_PAGES,
+						   "cnss-mhi", 0);
+	if (!mhi_ctrl->log_buf)
+		cnss_pr_err("Unable to create CNSS MHI IPC log context\n");
+
+	mhi_ctrl->cntrl_log_buf = ipc_log_context_create(CNSS_IPC_LOG_PAGES,
+							 "cnss-mhi-cntrl", 0);
+	if (!mhi_ctrl->cntrl_log_buf)
+		cnss_pr_err("Unable to create CNSS MHICNTRL IPC log context\n");
 
 	ret = of_register_mhi_controller(mhi_ctrl);
 	if (ret) {
@@ -4940,7 +4912,10 @@ static int cnss_pci_register_mhi(struct cnss_pci_data *pci_priv)
 unreg_mhi:
 	mhi_unregister_mhi_controller(mhi_ctrl);
 destroy_ipc:
-	cnss_pci_mhi_ipc_logging_deinit(pci_priv);
+	if (mhi_ctrl->log_buf)
+		ipc_log_context_destroy(mhi_ctrl->log_buf);
+	if (mhi_ctrl->cntrl_log_buf)
+		ipc_log_context_destroy(mhi_ctrl->cntrl_log_buf);
 	kfree(mhi_ctrl->irq);
 free_mhi_ctrl:
 	mhi_free_controller(mhi_ctrl);
@@ -4953,7 +4928,10 @@ static void cnss_pci_unregister_mhi(struct cnss_pci_data *pci_priv)
 	struct mhi_controller *mhi_ctrl = pci_priv->mhi_ctrl;
 
 	mhi_unregister_mhi_controller(mhi_ctrl);
-	cnss_pci_mhi_ipc_logging_deinit(pci_priv);
+	if (mhi_ctrl->log_buf)
+		ipc_log_context_destroy(mhi_ctrl->log_buf);
+	if (mhi_ctrl->cntrl_log_buf)
+		ipc_log_context_destroy(mhi_ctrl->cntrl_log_buf);
 	kfree(mhi_ctrl->irq);
 	mhi_ctrl->irq = NULL;
 	mhi_free_controller(mhi_ctrl);
